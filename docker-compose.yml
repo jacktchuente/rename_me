@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  renameme:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./media:/app/media
+    environment:
+      - PYTHONUNBUFFERED=1

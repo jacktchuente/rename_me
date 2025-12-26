@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rename Me</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="grain"></div>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Rename Me</p>
+        <h1>Renommez vos fichiers, sans stress.</h1>
+        <p class="lead">
+          Combinez plusieurs transformations, previsualisez le resultat, puis appliquez-le
+          sur un dossier entier.
+        </p>
+      </div>
+      <div class="hero-card">
+        <div class="hero-icon">RM</div>
+        <div>
+          <p class="mono">Transformation chain</p>
+          <p class="hero-meta">Ordre libre, multi-etapes</p>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel panel-dir">
+        <h2>Dossier</h2>
+        <div class="row">
+          <input id="directory" type="text" placeholder="/chemin/vers/le/dossier" />
+          <button id="loadFiles" class="primary">Charger</button>
+        </div>
+        <div class="info">
+          <p>Fichiers detectes</p>
+          <ul id="fileList" class="file-list"></ul>
+        </div>
+      </section>
+
+      <section class="panel panel-presets">
+        <h2>Presets</h2>
+        <div class="row">
+          <input id="presetName" type="text" placeholder="Nom du preset" />
+          <button id="savePreset" class="secondary">Enregistrer</button>
+        </div>
+        <div class="row">
+          <select id="presetSelect"></select>
+          <button id="loadPreset" class="secondary">Charger</button>
+          <button id="deletePreset" class="ghost">Supprimer</button>
+        </div>
+        <p class="hint">Les presets sont stockes dans un fichier JSON local.</p>
+      </section>
+
+      <section class="panel panel-transforms">
+        <div class="panel-header">
+          <h2>Transformations</h2>
+          <span class="badge">ordre libre</span>
+        </div>
+        <div class="transform-toolbar">
+          <button id="addDelete" class="ghost">+ Suppression</button>
+          <button id="addExtract" class="ghost">+ Extraction</button>
+          <button id="addOrder" class="ghost">+ Ordre</button>
+          <button id="addPadding" class="ghost">+ Padding</button>
+          <button id="addImdb" class="ghost">+ IMDb</button>
+        </div>
+        <div id="transformList" class="transform-list"></div>
+        <div class="panel-footer">
+          <button id="preview" class="secondary">Previsualiser</button>
+          <button id="apply" class="primary">Appliquer</button>
+        </div>
+        <div id="progress" class="progress hidden">
+          <div class="progress-track">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+          <p id="progressText" class="progress-text">Traitement...</p>
+        </div>
+        <div id="alerts" class="alerts"></div>
+      </section>
+
+      <section class="panel panel-preview">
+        <div class="panel-header">
+          <h2>Previsualisation</h2>
+          <span id="previewMeta" class="badge">0 elements</span>
+        </div>
+        <div class="table">
+          <div class="table-row table-head">
+            <span>Original</span>
+            <span>Nouveau nom</span>
+          </div>
+          <div id="previewRows" class="table-body"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
