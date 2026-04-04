@@ -1,0 +1,31 @@
+volumes:
+  episode_data:
+    external: true
+
+networks:
+  traefik_default:
+    external: true
+
+services:
+  app:
+    container_name: rename-me
+    image: rename-me/rename-me:latest
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.${PROJECT_NAME}-client.entrypoints=websecure
+      - traefik.http.routers.${PROJECT_NAME}-client.rule=Host(`${DOMAIN_NAME}`)
+      - traefik.http.services.${PROJECT_NAME}-client.loadbalancer.server.port=8000
+      - traefik.http.routers.${PROJECT_NAME}-client-http.entrypoints=web
+      - traefik.http.routers.${PROJECT_NAME}-client-http.middlewares=to-https
+      - traefik.http.routers.${PROJECT_NAME}-client.service=${PROJECT_NAME}-client
+      - traefik.http.routers.${PROJECT_NAME}-client.tls=true
+      - traefik.http.routers.${PROJECT_NAME}-client.tls.certresolver=letsencrypt
+      - traefik.http.middlewares.to-https.redirectscheme.scheme=websecure
+    networks:
+      - traefik_default
+    env_file:
+      - .env
+    volumes:
+      - episode_data:/app/media
+      - /srv/docker/rename-me:/app/data
