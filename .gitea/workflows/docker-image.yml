@@ -1,0 +1,144 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+
+jobs:
+  build_app:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          path: repo
+
+      - name: Install runner dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y git-crypt rsync openssh-client
+
+      - name: Unlock git-crypt on runner
+        env:
+          RM_DEPLOY_GIT_CRYPT_KEY: ${{ secrets.RM_DEPLOY_GIT_CRYPT_KEY }}
+        run: |
+          set -euo pipefail
+
+          printf '%s' "$RM_DEPLOY_GIT_CRYPT_KEY" | base64 -d > /tmp/git-crypt-key
+          chmod 600 /tmp/git-crypt-key
+
+          cd repo
+          git-crypt unlock /tmp/git-crypt-key
+
+          rm -f /tmp/git-crypt-key
+
+      - name: Build Docker image - Api
+        working-directory: repo
+        run: |
+          set -euo pipefail
+          docker build -t rename-me/rename-me:latest ./
+
+      - name: Export Docker image
+        working-directory: repo
+        run: |
+          set -euo pipefail
+          docker save rename-me/rename-me:latest -o rename-me.tar
+
+      - name: Prepare SSH
+        env:
+          LIVE_DEPLOY_SSH_KEY: ${{ secrets.LIVE_DEPLOY_SSH_KEY }}
+          LIVE_DEPLOY_KNOWN_HOSTS: ${{ secrets.LIVE_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$LIVE_DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          printf '%s\n' "$LIVE_DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Define remote project path
+        id: project
+        env:
+          LIVE_DEPLOY_PATH_WORKSPACE: ${{ secrets.LIVE_DEPLOY_PATH_WORKSPACE }}
+        run: |
+          set -euo pipefail
+          PROJECT_NAME="${{ github.event.repository.name }}"
+          echo "project_name=${PROJECT_NAME}" >> "$GITHUB_OUTPUT"
+          echo "remote_project_path=${LIVE_DEPLOY_PATH_WORKSPACE}/${PROJECT_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Create remote target directory
+        env:
+          LIVE_DEPLOY_HOST: ${{ secrets.LIVE_DEPLOY_HOST }}
+          LIVE_DEPLOY_USER: ${{ secrets.LIVE_DEPLOY_USER }}
+          REMOTE_PROJECT_PATH: ${{ steps.project.outputs.remote_project_path }}
+        run: |
+          set -euo pipefail
+
+          ssh -i ~/.ssh/id_ed25519 "${LIVE_DEPLOY_USER}@${LIVE_DEPLOY_HOST}" \
+            "mkdir -p '${REMOTE_PROJECT_PATH}'"
+
+      - name: Sync repository to remote host
+        env:
+          LIVE_DEPLOY_HOST: ${{ secrets.LIVE_DEPLOY_HOST }}
+          LIVE_DEPLOY_USER: ${{ secrets.LIVE_DEPLOY_USER }}
+          REMOTE_PROJECT_PATH: ${{ steps.project.outputs.remote_project_path }}
+        run: |
+          set -euo pipefail
+
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude 'rename-me.tar' \
+            -e "ssh -i ~/.ssh/id_ed25519" \
+            repo/ "${LIVE_DEPLOY_USER}@${LIVE_DEPLOY_HOST}:${REMOTE_PROJECT_PATH}/"
+
+      - name: Transfer Docker image to remote host
+        env:
+          LIVE_DEPLOY_HOST: ${{ secrets.LIVE_DEPLOY_HOST }}
+          LIVE_DEPLOY_USER: ${{ secrets.LIVE_DEPLOY_USER }}
+          REMOTE_PROJECT_PATH: ${{ steps.project.outputs.remote_project_path }}
+        run: |
+          set -euo pipefail
+
+          scp -i ~/.ssh/id_ed25519 repo/rename-me.tar \
+            "${LIVE_DEPLOY_USER}@${LIVE_DEPLOY_HOST}:${REMOTE_PROJECT_PATH}/rename-me.tar"
+
+      - name: Load Docker image and start compose on remote host
+        env:
+          LIVE_DEPLOY_HOST: ${{ secrets.LIVE_DEPLOY_HOST }}
+          LIVE_DEPLOY_USER: ${{ secrets.LIVE_DEPLOY_USER }}
+          REMOTE_PROJECT_PATH: ${{ steps.project.outputs.remote_project_path }}
+        run: |
+          set -euo pipefail
+
+          ssh -i ~/.ssh/id_ed25519 "${LIVE_DEPLOY_USER}@${LIVE_DEPLOY_HOST}" /bin/bash <<EOF
+          set -euo pipefail
+
+          cd "${REMOTE_PROJECT_PATH}"
+
+          docker load -i rename-me.tar
+          rm -f rename-me.tar
+          docker compose down --remove-orphans
+          docker compose up -d
+          EOF
+
+  sonarqube:
+    if: startsWith(github.ref, 'refs/heads/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: https://gitea.fyrex.top/red/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
